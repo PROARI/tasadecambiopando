@@ -109,8 +109,10 @@ function loadRates() {
         currentRates = JSON.parse(JSON.stringify(DEFAULT_RATES));
     }
 
-    // Sync from cloud database in background
-    fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${DB_APP_KEY}/${DB_KEY}`)
+    // Sync from cloud database in background with cache-busting to ensure latest rates
+    fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${DB_APP_KEY}/${DB_KEY}?t=${Date.now()}`, {
+        cache: 'no-store'
+    })
         .then(response => {
             if (response.ok) {
                 return response.text();
