@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bolivia Cambio - Tipos de Cambio Oficial y Referencial</title>
+    <meta name="description" content="Monitoreo interactivo de tipos de cambio en Bolivia para Dólares (USD), Reales (BRL) y Soles (PEN). Consulta tipos de cambio oficiales y referenciales de compra y venta.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Elements for Premium Look -->
+    <div class="bg-blur blur-1"></div>
+    <div class="bg-blur blur-2"></div>
+    <div class="bg-blur blur-3"></div>
+
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="logo-icon">
+                    <i data-lucide="trending-up"></i>
+                </div>
+                <div>
+                    <h1>Bolivia Cambio</h1>
+                    <p class="subtitle">Monitoreo de Divisas BOB</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div class="live-clock">
+                    <i data-lucide="clock"></i>
+                    <span id="current-time">Cargando hora...</span>
+                </div>
+                <button id="theme-toggle" class="icon-btn" title="Alternar Tema" aria-label="Alternar Tema">
+                    <i data-lucide="sun" class="sun-icon"></i>
+                    <i data-lucide="moon" class="moon-icon"></i>
+                </button>
+                <button id="config-toggle" class="primary-btn" title="Configurar Tasas">
+                    <i data-lucide="sliders"></i>
+                    <span>Ajustar Tasas</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- TICKER / BANNER -->
+        <div class="ticker-wrapper">
+            <div class="ticker-content">
+                <span class="ticker-item"><span class="badge live">EN VIVO</span> Mercado Cambiario de Bolivia</span>
+                <span class="ticker-divider">•</span>
+                <span class="ticker-item">Base de conversión: <strong>Boliviano (BOB / Bs.)</strong></span>
+                <span class="ticker-divider">•</span>
+                <span class="ticker-item">Las tasas referenciales reflejan el promedio del mercado libre e informal.</span>
+                <span class="ticker-divider">•</span>
+                <span class="ticker-item">Actualizado en tiempo real por el usuario.</span>
+            </div>
+        </div>
+
+        <!-- MAIN LAYOUT -->
+        <main class="main-grid">
+            <!-- LEFT COLUMN: CARDS -->
+            <section class="cards-section" aria-labelledby="currency-rates-title">
+                <h2 id="currency-rates-title" class="section-title">Cotizaciones Cambiarias</h2>
+                <div class="currency-grid">
+                    
+                    <!-- USD Card -->
+                    <article class="currency-card" id="card-usd">
+                        <div class="card-header">
+                            <div class="currency-info">
+                                <div class="flag-wrapper usd">
+                                    <span>🇺🇸</span>
+                                </div>
+                                <div>
+                                    <h3>Dólar Americano</h3>
+                                    <span class="currency-code">USD / $</span>
+                                </div>
+                            </div>
+                            <div class="gap-indicator" id="gap-usd" title="Brecha entre Oficial y Referencial">--%</div>
+                        </div>
+
+                        <div class="rates-display">
+                            <!-- Oficial -->
+                            <div class="rate-column official">
+                                <div class="rate-header">
+                                    <span class="rate-type-tag">Oficial</span>
+                                </div>
+                                <div class="rate-box-grid">
+                                    <div class="rate-box">
+                                        <span class="rate-label">Compra</span>
+                                        <span class="rate-val" id="usd-off-buy">--.--</span>
+                                    </div>
+                                    <div class="rate-box">
+                                        <span class="rate-label">Venta</span>
+                                        <span class="rate-val" id="usd-off-sell">--.--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Referencial -->
+                            <div class="rate-column referential">
+                                <div class="rate-header">
+                                    <span class="rate-type-tag">Referencial</span>
+                                </div>
+                                <div class="rate-box-grid">
+                                    <div class="rate-box highlight-buy">
+                                        <span class="rate-label">Compra</span>
+                                        <span class="rate-val" id="usd-ref-buy">--.--</span>
+                                    </div>
+                                    <div class="rate-box highlight-sell">
+                                        <span class="rate-label">Venta</span>
+                                        <span class="rate-val" id="usd-ref-sell">--.--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <span>1 USD equivale a la tasa seleccionada</span>
+                        </div>
+                    </article>
+
+                    <!-- BRL Card -->
+                    <article class="currency-card" id="card-brl">
+                        <div class="card-header">
+                            <div class="currency-info">
+                                <div class="flag-wrapper brl">
+                                    <span>🇧🇷</span>
+                                </div>
+                                <div>
+                                    <h3>Real Brasileño</h3>
+                                    <span class="currency-code">BRL / R$</span>
+                                </div>
+                            </div>
+                            <div class="gap-indicator" id="gap-brl" title="Brecha entre Oficial y Referencial">--%</div>
+                        </div>
+
+                        <div class="rates-display">
+                            <!-- Oficial -->
+                            <div class="rate-column official">
+                                <div class="rate-header">
+                                    <span class="rate-type-tag">Oficial</span>
+                                </div>
+                                <div class="rate-box-grid">
+                                    <div class="rate-box">
+                                        <span class="rate-label">Compra</span>
+                                        <span class="rate-val" id="brl-off-buy">--.--</span>
+                                    </div>
+                                    <div class="rate-box">
+                                        <span class="rate-label">Venta</span>
+                                        <span class="rate-val" id="brl-off-sell">--.--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Referencial -->
+                            <div class="rate-column referential">
+                                <div class="rate-header">
+                                    <span class="rate-type-tag">Referencial</span>
+                                </div>
+                                <div class="rate-box-grid">
+                                    <div class="rate-box highlight-buy">
+                                        <span class="rate-label">Compra</span>
+                                        <span class="rate-val" id="brl-ref-buy">--.--</span>
+                                    </div>
+                                    <div class="rate-box highlight-sell">
+                                        <span class="rate-label">Venta</span>
+                                        <span class="rate-val" id="brl-ref-sell">--.--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <span>1 BRL equivale a la tasa seleccionada</span>
+                        </div>
+                    </article>
+
+                    <!-- PEN Card -->
+                    <article class="currency-card" id="card-pen">
+                        <div class="card-header">
+                            <div class="currency-info">
+                                <div class="flag-wrapper pen">
+                                    <span>🇵🇪</span>
+                                </div>
+                                <div>
+                                    <h3>Sol Peruano</h3>
+                                    <span class="currency-code">PEN / S/.</span>
+                                </div>
+                            </div>
+                            <div class="gap-indicator" id="gap-pen" title="Brecha entre Oficial y Referencial">--%</div>
+                        </div>
+
+                        <div class="rates-display">
+                            <!-- Oficial -->
+                            <div class="rate-column official">
+                                <div class="rate-header">
+                                    <span class="rate-type-tag">Oficial</span>
+                                </div>
+                                <div class="rate-box-grid">
+                                    <div class="rate-box">
+                                        <span class="rate-label">Compra</span>
+                                        <span class="rate-val" id="pen-off-buy">--.--</span>
+                                    </div>
+                                    <div class="rate-box">
+                                        <span class="rate-label">Venta</span>
+                                        <span class="rate-val" id="pen-off-sell">--.--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Referencial -->
+                            <div class="rate-column referential">
+                                <div class="rate-header">
+                                    <span class="rate-type-tag">Referencial</span>
+                                </div>
+                                <div class="rate-box-grid">
+                                    <div class="rate-box highlight-buy">
+                                        <span class="rate-label">Compra</span>
+                                        <span class="rate-val" id="pen-ref-buy">--.--</span>
+                                    </div>
+                                    <div class="rate-box highlight-sell">
+                                        <span class="rate-label">Venta</span>
+                                        <span class="rate-val" id="pen-ref-sell">--.--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <span>1 PEN equivale a la tasa seleccionada</span>
+                        </div>
+                    </article>
+
+                </div>
+            </section>
+
+            <!-- RIGHT COLUMN: TOOLS & CHART -->
+            <div class="tools-column">
+                <!-- CALCULATOR -->
+                <section class="calculator-card" aria-labelledby="calc-title">
+                    <div class="card-header-simple">
+                        <i data-lucide="calculator"></i>
+                        <h2 id="calc-title">Calculadora Cambiaria</h2>
+                    </div>
+
+                    <div class="calc-body">
+                        <!-- Operation settings -->
+                        <div class="input-group-row">
+                            <div class="toggle-selector">
+                                <button type="button" class="toggle-btn active" id="btn-buy" data-op="buy">
+                                    Comprar Divisa
+                                </button>
+                                <button type="button" class="toggle-btn" id="btn-sell" data-op="sell">
+                                    Vender Divisa
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="input-group-row">
+                            <div class="rate-selector-pills">
+                                <button type="button" class="pill-btn active" id="pill-ref" data-rate-type="referential">
+                                    <span class="dot green"></span> Referencial
+                                </button>
+                                <button type="button" class="pill-btn" id="pill-off" data-rate-type="official">
+                                    <span class="dot blue"></span> Oficial
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Amount Input -->
+                        <div class="calc-field">
+                            <label for="amount-input">Monto a convertir</label>
+                            <div class="input-wrapper">
+                                <input type="number" id="amount-input" value="100" min="0" placeholder="0.00" step="any">
+                                <select id="currency-select" class="currency-dropdown">
+                                    <option value="BOB">BOB (Bs.)</option>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="BRL">BRL (R$)</option>
+                                    <option value="PEN">PEN (S/.)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Target currency selector (dynamic when primary is BOB) -->
+                        <div class="calc-field" id="target-currency-field">
+                            <label for="target-currency-select">Convertir a</label>
+                            <div class="input-wrapper-select-only">
+                                <select id="target-currency-select" class="currency-dropdown-full">
+                                    <option value="USD">Dólar Americano (USD)</option>
+                                    <option value="BRL">Real Brasileño (BRL)</option>
+                                    <option value="PEN">Sol Peruano (PEN)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Results display -->
+                        <div class="calc-result-box">
+                            <div class="result-label">Resultado Estimado</div>
+                            <div class="result-value" id="calc-result-text">--.--</div>
+                            <div class="result-details" id="calc-details-text">Tasa aplicada: 1 USD = --.-- BOB</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- HISTORICAL TREND -->
+                <section class="trend-card" aria-labelledby="trend-title">
+                    <div class="card-header-tabbed">
+                        <div class="title-group">
+                            <i data-lucide="area-chart"></i>
+                            <h2 id="trend-title">Tendencia (7D)</h2>
+                        </div>
+                        <div class="chart-tabs">
+                            <button class="tab-btn active" data-chart-curr="USD">USD</button>
+                            <button class="tab-btn" data-chart-curr="BRL">BRL</button>
+                            <button class="tab-btn" data-chart-curr="PEN">PEN</button>
+                        </div>
+                    </div>
+                    <div class="trend-body">
+                        <!-- SVG Chart Rendered dynamically via JS -->
+                        <div class="chart-container" id="trend-chart-container">
+                            <svg id="trend-svg" viewBox="0 0 500 220" preserveAspectRatio="none">
+                                <!-- Chart background grid and paths created via JS -->
+                            </svg>
+                            <div class="chart-tooltip" id="chart-tooltip"></div>
+                        </div>
+                        
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="line-dot ref"></span> Referencial</span>
+                            <span class="legend-item"><span class="line-dot off"></span> Oficial</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- CONFIGURATION DRAWER / MODAL -->
+        <div class="drawer-overlay" id="drawer-overlay"></div>
+        <aside class="drawer" id="config-drawer" role="dialog" aria-labelledby="drawer-title" aria-hidden="true">
+            <div class="drawer-header">
+                <div class="title-group">
+                    <i data-lucide="settings"></i>
+                    <h2 id="drawer-title">Configuración de Tasas</h2>
+                </div>
+                <button id="drawer-close" class="close-btn" aria-label="Cerrar Panel">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <div class="drawer-body">
+                <!-- Seccion de Login -->
+                <div id="login-section" class="drawer-section">
+                    <div class="lock-icon-container">
+                        <i data-lucide="lock" class="lock-icon-large"></i>
+                    </div>
+                    <h3 class="login-title">Acceso Restringido</h3>
+                    <p class="drawer-desc center">Ingrese sus credenciales de administrador para poder modificar las tasas de cambio.</p>
+                    
+                    <form id="login-form" class="login-form">
+                        <div class="form-row">
+                            <label for="login-username">Usuario</label>
+                            <div class="input-wrapper-icon">
+                                <i data-lucide="user" class="input-icon"></i>
+                                <input type="text" id="login-username" placeholder="Nombre de usuario" autocomplete="username" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label for="login-password">Contraseña</label>
+                            <div class="input-wrapper-icon">
+                                <i data-lucide="key-round" class="input-icon"></i>
+                                <input type="password" id="login-password" placeholder="Contraseña de acceso" autocomplete="current-password" required>
+                            </div>
+                        </div>
+                        <div class="login-error-msg" id="login-error-msg" style="display: none;">
+                            <i data-lucide="alert-circle"></i> Credenciales incorrectas
+                        </div>
+                        <button type="submit" class="primary-btn-submit login-submit-btn">
+                            <i data-lucide="shield-check"></i> Acceder al Panel
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Seccion de Editor (Oculta por defecto) -->
+                <div id="editor-section" class="drawer-section" style="display: none;">
+                    <div class="editor-header-row">
+                        <p class="drawer-desc">Modifique las tasas oficiales y referenciales. Se guardarán en el almacenamiento de su navegador.</p>
+                        <button type="button" id="btn-logout" class="logout-btn" title="Cerrar Sesión">
+                            <i data-lucide="log-out"></i>
+                            <span>Salir</span>
+                        </button>
+                    </div>
+                    
+                    <form id="rates-form">
+                        <!-- USD Rates -->
+                        <fieldset class="form-fieldset">
+                            <legend><span class="flag-inline">🇺🇸</span> Dólar Americano (USD)</legend>
+                            
+                            <div class="form-row">
+                                <div class="form-group-title">Oficial (Banco Central)</div>
+                                <div class="form-grid-inputs">
+                                    <div class="input-subgroup">
+                                        <label for="input-usd-off-buy">Compra</label>
+                                        <input type="number" id="input-usd-off-buy" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="input-subgroup">
+                                        <label for="input-usd-off-sell">Venta</label>
+                                        <input type="number" id="input-usd-off-sell" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group-title">Referencial (Mercado Libre)</div>
+                                <div class="form-grid-inputs">
+                                    <div class="input-subgroup">
+                                        <label for="input-usd-ref-buy">Compra</label>
+                                        <input type="number" id="input-usd-ref-buy" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="input-subgroup">
+                                        <label for="input-usd-ref-sell">Venta</label>
+                                        <input type="number" id="input-usd-ref-sell" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- BRL Rates -->
+                        <fieldset class="form-fieldset">
+                            <legend><span class="flag-inline">🇧🇷</span> Real Brasileño (BRL)</legend>
+                            
+                            <div class="form-row">
+                                <div class="form-group-title">Oficial (Banco Central)</div>
+                                <div class="form-grid-inputs">
+                                    <div class="input-subgroup">
+                                        <label for="input-brl-off-buy">Compra</label>
+                                        <input type="number" id="input-brl-off-buy" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="input-subgroup">
+                                        <label for="input-brl-off-sell">Venta</label>
+                                        <input type="number" id="input-brl-off-sell" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group-title">Referencial (Mercado Libre)</div>
+                                <div class="form-grid-inputs">
+                                    <div class="input-subgroup">
+                                        <label for="input-brl-ref-buy">Compra</label>
+                                        <input type="number" id="input-brl-ref-buy" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="input-subgroup">
+                                        <label for="input-brl-ref-sell">Venta</label>
+                                        <input type="number" id="input-brl-ref-sell" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- PEN Rates -->
+                        <fieldset class="form-fieldset">
+                            <legend><span class="flag-inline">🇵🇪</span> Sol Peruano (PEN)</legend>
+                            
+                            <div class="form-row">
+                                <div class="form-group-title">Oficial (Banco Central)</div>
+                                <div class="form-grid-inputs">
+                                    <div class="input-subgroup">
+                                        <label for="input-pen-off-buy">Compra</label>
+                                        <input type="number" id="input-pen-off-buy" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="input-subgroup">
+                                        <label for="input-pen-off-sell">Venta</label>
+                                        <input type="number" id="input-pen-off-sell" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group-title">Referencial (Mercado Libre)</div>
+                                <div class="form-grid-inputs">
+                                    <div class="input-subgroup">
+                                        <label for="input-pen-ref-buy">Compra</label>
+                                        <input type="number" id="input-pen-ref-buy" step="0.01" min="0" required>
+                                    </div>
+                                    <div class="input-subgroup">
+                                        <label for="input-pen-ref-sell">Venta</label>
+                                        <input type="number" id="input-pen-ref-sell" step="0.01" min="0" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </form>
+
+                    <div class="drawer-footer-inner">
+                        <button type="button" id="btn-reset-rates" class="secondary-btn">Restablecer Predeterminados</button>
+                        <button type="submit" form="rates-form" class="primary-btn-submit">Guardar Cambios</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <p>© 2026 Bolivia Cambio. Desarrollado con excelencia visual e interactiva.</p>
+            <p class="disclaimer">Esta página web es de carácter referencial y didáctico. Los datos paralelos corresponden a cotizaciones de mercado estimadas.</p>
+        </footer>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast" id="toast">
+        <i data-lucide="check-circle" class="toast-icon"></i>
+        <span id="toast-message">Cambios guardados con éxito.</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
