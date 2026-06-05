@@ -1491,3 +1491,25 @@ html[data-theme="light"] .form-fieldset {
     font-size: 11px;
     line-height: 1.4;
 }
+
+/* Spinner / Loading animation */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.mr-2 {
+    margin-right: 0.5rem;
+}
+
+.inline-block {
+    display: inline-block;
+}

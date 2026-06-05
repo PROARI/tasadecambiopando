@@ -19,7 +19,30 @@ const DEFAULT_RATES = {
 
 let currentRates = {};
 
-// Load rates from localStorage or fall back to defaults
+const DB_APP_KEY = 'fwcuwrg1';
+const DB_KEY = 'rates';
+
+// Base64Url helper functions for safe URL parameter storage
+function base64UrlEncode(str) {
+    const base64 = btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+        return String.fromCharCode('0x' + p1);
+    }));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function base64UrlDecode(str) {
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+        base64 += '=';
+    }
+    const raw = atob(base64);
+    const decoded = raw.split('').map(c => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join('');
+    return decodeURIComponent(decoded);
+}
+
+// Load rates from localStorage (fast cache) and sync from cloud asynchronously
 function loadRates() {
     const saved = localStorage.getItem('bolivia_cambio_rates');
     if (saved) {
@@ -32,20 +55,74 @@ function loadRates() {
     } else {
         currentRates = JSON.parse(JSON.stringify(DEFAULT_RATES));
     }
+
+    // Sync from cloud database in background
+    fetch(`https://keyvalue.immanuel.co/api/KeyVal/GetValue/${DB_APP_KEY}/${DB_KEY}`)
+        .then(response => {
+            if (response.ok) {
+                return response.text();
+            }
+            throw new Error('Cloud fetch failed');
+        })
+        .then(dataStr => {
+            if (dataStr && dataStr.trim() !== "" && dataStr !== "null") {
+                let cleanData = dataStr.trim();
+                if (cleanData.startsWith('"') && cleanData.endsWith('"')) {
+                    cleanData = cleanData.substring(1, cleanData.length - 1);
+                }
+                const decodedJson = base64UrlDecode(cleanData);
+                const cloudRates = JSON.parse(decodedJson);
+                
+                // Validate structure to avoid corruption
+                if (cloudRates && cloudRates.USD && cloudRates.USD.official) {
+                    currentRates = cloudRates;
+                    localStorage.setItem('bolivia_cambio_rates', JSON.stringify(currentRates));
+                    updateUI();
+                    console.log('Rates synchronized from cloud.');
+                }
+            }
+        })
+        .catch(err => {
+            console.warn('Unable to sync rates from cloud, using cached or default rates:', err);
+        });
 }
 
-// Save current rates to localStorage
-function saveRates() {
+// Save current rates to localStorage and cloud database
+async function saveRates() {
     localStorage.setItem('bolivia_cambio_rates', JSON.stringify(currentRates));
+    
+    try {
+        const jsonStr = JSON.stringify(currentRates);
+        const encoded = base64UrlEncode(jsonStr);
+        const response = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${DB_APP_KEY}/${DB_KEY}/${encoded}`, {
+            method: 'POST'
+        });
+        if (response.ok) {
+            const result = await response.text();
+            if (result === 'true' || result === 'True') {
+                console.log('Rates saved to cloud successfully.');
+                return true;
+            }
+        }
+        throw new Error('Cloud save rejected by server');
+    } catch (e) {
+        console.error('Error saving rates to cloud:', e);
+        return false;
+    }
 }
 
 // Reset rates to default
-function resetRatesToDefault() {
+async function resetRatesToDefault() {
     currentRates = JSON.parse(JSON.stringify(DEFAULT_RATES));
-    saveRates();
+    const savedGlobally = await saveRates();
     updateUI();
-    showToast('Tasas restauradas a los valores predeterminados.');
+    if (savedGlobally) {
+        showToast('Tasas restauradas y sincronizadas globalmente.');
+    } else {
+        showToast('Tasas restauradas localmente (error al sincronizar en la nube).');
+    }
 }
+
 
 // ==========================================================================
 // DATE & CLOCK UTIL
@@ -663,8 +740,17 @@ function initDrawer() {
     });
 
     // Form submission
-    ratesForm.addEventListener('submit', (e) => {
+    ratesForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        // Show saving state on the submit button
+        const submitBtn = ratesForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin inline-block mr-2"></i> Guardando...';
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
         
         // Retrieve values from form
         currentRates.USD.official.buy = parseFloat(document.getElementById('input-usd-off-buy').value);
@@ -682,17 +768,36 @@ function initDrawer() {
         currentRates.PEN.referential.buy = parseFloat(document.getElementById('input-pen-ref-buy').value);
         currentRates.PEN.referential.sell = parseFloat(document.getElementById('input-pen-ref-sell').value);
 
-        saveRates();
+        const savedGlobally = await saveRates();
         updateUI();
         closeDrawer();
-        showToast('Tasas de cambio actualizadas con éxito.');
+        
+        // Restore button state
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+        
+        if (savedGlobally) {
+            showToast('Tasas de cambio actualizadas con éxito de manera global.');
+        } else {
+            showToast('Tasas actualizadas localmente (error al sincronizar en la nube).');
+        }
     });
 
     // Reset button inside drawer
-    resetBtn.addEventListener('click', () => {
+    resetBtn.addEventListener('click', async () => {
         if (confirm('¿Está seguro de que desea restablecer las tasas predeterminadas?')) {
-            resetRatesToDefault();
+            const originalBtnText = resetBtn.textContent;
+            resetBtn.disabled = true;
+            resetBtn.textContent = 'Restableciendo...';
+            
+            await resetRatesToDefault();
             populateDrawerInputs();
+            
+            resetBtn.disabled = false;
+            resetBtn.textContent = originalBtnText;
         }
     });
 }
