@@ -237,6 +237,41 @@
                     </article>
 
                 </div>
+
+                <!-- HISTORICAL LOG SECTION -->
+                <div class="history-log-section">
+                    <div class="card-header-tabbed">
+                        <div class="title-group-inline">
+                            <i data-lucide="history"></i>
+                            <h2 id="history-log-title">Historial de Tasas Registradas</h2>
+                        </div>
+                        <div class="history-tabs">
+                            <button type="button" class="history-tab-btn active" data-hist-curr="USD">USD</button>
+                            <button type="button" class="history-tab-btn" data-hist-curr="BRL">BRL</button>
+                            <button type="button" class="history-tab-btn" data-hist-curr="PEN">PEN</button>
+                        </div>
+                    </div>
+                    <div class="history-card">
+                        <div class="history-table-wrapper">
+                            <table class="history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha y Hora</th>
+                                        <th>Compra Oficial</th>
+                                        <th>Venta Oficial</th>
+                                        <th>Compra Referencial</th>
+                                        <th>Venta Referencial</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body">
+                                    <tr>
+                                        <td colspan="5" class="no-data">Cargando historial...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- RIGHT COLUMN: TOOLS & CHART -->
@@ -497,7 +532,7 @@
 
                     <div class="drawer-footer-inner">
                         <button type="button" id="btn-reset-rates" class="secondary-btn">Restablecer Predeterminados</button>
-                        <button type="submit" form="rates-form" class="primary-btn-submit">Guardar Cambios</button>
+                        <button type="submit" id="btn-save-rates" form="rates-form" class="primary-btn-submit">Guardar Cambios</button>
                     </div>
                 </div>
             </div>

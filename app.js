@@ -14,13 +14,16 @@ const DEFAULT_RATES = {
     PEN: {
         official: { buy: 1.83, sell: 1.86 },
         referential: { buy: 2.90, sell: 3.10 }
-    }
+    },
+    updatedAt: 0
 };
 
 let currentRates = {};
+let ratesHistory = [];
 
 const DB_APP_KEY = 'fwcuwrg1';
 const DB_KEY = 'rates';
+const DB_HISTORY_KEY = 'rates_history';
 
 // Base64Url helper functions for safe URL parameter storage
 function base64UrlEncode(str) {
@@ -40,6 +43,56 @@ function base64UrlDecode(str) {
         return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join('');
     return decodeURIComponent(decoded);
+}
+
+// Compress rates to a compact CSV string to save space and fit in URL paths
+function compressRates(rates, timestamp) {
+    const parts = [
+        rates.USD.official.buy, rates.USD.official.sell, rates.USD.referential.buy, rates.USD.referential.sell,
+        rates.BRL.official.buy, rates.BRL.official.sell, rates.BRL.referential.buy, rates.BRL.referential.sell,
+        rates.PEN.official.buy, rates.PEN.official.sell, rates.PEN.referential.buy, rates.PEN.referential.sell,
+        timestamp || Date.now()
+    ];
+    return parts.join(',');
+}
+
+// Decompress rates from the compact CSV string format
+function decompressRates(compressedStr) {
+    const p = compressedStr.split(',').map(Number);
+    if (p.length < 13 || p.some(isNaN)) {
+        throw new Error('Invalid compressed rates format');
+    }
+    return {
+        USD: {
+            official: { buy: p[0], sell: p[1] },
+            referential: { buy: p[2], sell: p[3] }
+        },
+        BRL: {
+            official: { buy: p[4], sell: p[5] },
+            referential: { buy: p[6], sell: p[7] }
+        },
+        PEN: {
+            official: { buy: p[8], sell: p[9] },
+            referential: { buy: p[10], sell: p[11] }
+        },
+        updatedAt: p[12]
+    };
+}
+
+// Compare two rates objects to check for changes
+function isRatesDifferent(r1, r2) {
+    if (!r1 || !r2) return true;
+    for (const curr of ['USD', 'BRL', 'PEN']) {
+        if (!r1[curr] || !r2[curr]) return true;
+        if (!r1[curr].official || !r2[curr].official || !r1[curr].referential || !r2[curr].referential) return true;
+        if (r1[curr].official.buy !== r2[curr].official.buy ||
+            r1[curr].official.sell !== r2[curr].official.sell ||
+            r1[curr].referential.buy !== r2[curr].referential.buy ||
+            r1[curr].referential.sell !== r2[curr].referential.sell) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Load rates from localStorage (fast cache) and sync from cloud asynchronously
@@ -70,15 +123,85 @@ function loadRates() {
                 if (cleanData.startsWith('"') && cleanData.endsWith('"')) {
                     cleanData = cleanData.substring(1, cleanData.length - 1);
                 }
-                const decodedJson = base64UrlDecode(cleanData);
-                const cloudRates = JSON.parse(decodedJson);
+                const decodedStr = base64UrlDecode(cleanData);
+                let cloudRates = null;
+                
+                // Try to parse as CSV format first
+                if (decodedStr.includes(',') && !decodedStr.trim().startsWith('{')) {
+                    try {
+                        cloudRates = decompressRates(decodedStr);
+                    } catch (e) {
+                        console.error('Error parsing cloud rates as CSV:', e);
+                    }
+                } else {
+                    // Otherwise parse as JSON (old formats)
+                    try {
+                        const cloudData = JSON.parse(decodedStr);
+                        if (cloudData && cloudData.USD && cloudData.USD.o) {
+                            // Old JSON compressed format (o, r, b, s)
+                            cloudRates = {
+                                USD: {
+                                    official: { buy: cloudData.USD.o.b, sell: cloudData.USD.o.s },
+                                    referential: { buy: cloudData.USD.r.b, sell: cloudData.USD.r.s }
+                                },
+                                BRL: {
+                                    official: { buy: cloudData.BRL.o.b, sell: cloudData.BRL.o.s },
+                                    referential: { buy: cloudData.BRL.r.b, sell: cloudData.BRL.r.s }
+                                },
+                                PEN: {
+                                    official: { buy: cloudData.PEN.o.b, sell: cloudData.PEN.o.s },
+                                    referential: { buy: cloudData.PEN.r.b, sell: cloudData.PEN.r.s }
+                                },
+                                updatedAt: cloudData.t
+                            };
+                        } else if (cloudData && cloudData.USD && cloudData.USD.official && cloudData.USD.referential) {
+                            cloudRates = {
+                                ...cloudData,
+                                updatedAt: cloudData.updatedAt || Date.now()
+                            };
+                        }
+                    } catch (e) {
+                        console.error('Error parsing cloud rates as JSON:', e);
+                    }
+                }
                 
                 // Validate structure to avoid corruption
-                if (cloudRates && cloudRates.USD && cloudRates.USD.official) {
-                    currentRates = cloudRates;
-                    localStorage.setItem('bolivia_cambio_rates', JSON.stringify(currentRates));
-                    updateUI();
-                    console.log('Rates synchronized from cloud.');
+                if (cloudRates && cloudRates.USD && cloudRates.USD.official && cloudRates.USD.referential &&
+                    cloudRates.BRL && cloudRates.BRL.official && cloudRates.BRL.referential &&
+                    cloudRates.PEN && cloudRates.PEN.official && cloudRates.PEN.referential) {
+                    
+                    // Only update if cloud rates are strictly newer than local rates
+                    const localUpdated = currentRates.updatedAt || 0;
+                    const cloudUpdated = cloudRates.updatedAt || 0;
+                    
+                    if (cloudUpdated > localUpdated) {
+                        // Check if rates changed to append to history
+                        const lastEntry = ratesHistory.length > 0 ? ratesHistory[ratesHistory.length - 1] : null;
+                        const hasChanged = !lastEntry || isRatesDifferent(lastEntry.rates, cloudRates);
+                        
+                        currentRates = cloudRates;
+                        localStorage.setItem('bolivia_cambio_rates', JSON.stringify(currentRates));
+                        
+                        if (hasChanged) {
+                            const newEntry = {
+                                timestamp: new Date(currentRates.updatedAt).toISOString(),
+                                rates: JSON.parse(JSON.stringify(currentRates))
+                            };
+                            ratesHistory.push(newEntry);
+                            if (ratesHistory.length > 100) {
+                                ratesHistory.shift();
+                            }
+                            localStorage.setItem('bolivia_cambio_rates_history', JSON.stringify(ratesHistory));
+                            updateHistoryUI();
+                        }
+                        
+                        updateUI();
+                        console.log('Rates synchronized from cloud.');
+                    } else {
+                        console.log('Local rates are up-to-date or newer than cloud.');
+                    }
+                } else {
+                    console.warn('Fetched cloud rates have an invalid structure. Ignored to prevent corruption.');
                 }
             }
         })
@@ -87,13 +210,120 @@ function loadRates() {
         });
 }
 
+// Load history from localStorage (local-first)
+function loadHistory() {
+    const saved = localStorage.getItem('bolivia_cambio_rates_history');
+    if (saved) {
+        try {
+            ratesHistory = JSON.parse(saved);
+        } catch (e) {
+            console.error('Error parsing history from localStorage.', e);
+            ratesHistory = [];
+        }
+    }
+
+    if (ratesHistory.length === 0) {
+        generateInitialMockHistory();
+    } else {
+        updateHistoryUI();
+        drawChart(activeChartCurrency);
+    }
+}
+
+// Generate initial mock history for 7 days if empty
+function generateInitialMockHistory() {
+    const history = [];
+    const now = new Date();
+    const days = 7;
+    
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dayFactor = (days - 1 - i) - 6;
+        const scaleUSD = 0.12;
+        const scaleBRL = 0.05;
+        const scalePEN = 0.08;
+        const wave = Math.sin((days - 1 - i) * 1.2) * 0.4;
+        
+        const entry = {
+            timestamp: date.toISOString(),
+            rates: {
+                USD: {
+                    official: { 
+                        buy: parseFloat((DEFAULT_RATES.USD.official.buy).toFixed(2)), 
+                        sell: parseFloat((DEFAULT_RATES.USD.official.sell).toFixed(2)) 
+                    },
+                    referential: { 
+                        buy: parseFloat((DEFAULT_RATES.USD.referential.buy + dayFactor * scaleUSD + wave * scaleUSD).toFixed(2)), 
+                        sell: parseFloat((DEFAULT_RATES.USD.referential.sell + dayFactor * scaleUSD + wave * scaleUSD).toFixed(2)) 
+                    }
+                },
+                BRL: {
+                    official: { 
+                        buy: parseFloat((DEFAULT_RATES.BRL.official.buy).toFixed(2)), 
+                        sell: parseFloat((DEFAULT_RATES.BRL.official.sell).toFixed(2)) 
+                    },
+                    referential: { 
+                        buy: parseFloat((DEFAULT_RATES.BRL.referential.buy + dayFactor * scaleBRL + wave * scaleBRL).toFixed(2)), 
+                        sell: parseFloat((DEFAULT_RATES.BRL.referential.sell + dayFactor * scaleBRL + wave * scaleBRL).toFixed(2)) 
+                    }
+                },
+                PEN: {
+                    official: { 
+                        buy: parseFloat((DEFAULT_RATES.PEN.official.buy).toFixed(2)), 
+                        sell: parseFloat((DEFAULT_RATES.PEN.official.sell).toFixed(2)) 
+                    },
+                    referential: { 
+                        buy: parseFloat((DEFAULT_RATES.PEN.referential.buy + dayFactor * scalePEN + wave * scalePEN).toFixed(2)), 
+                        sell: parseFloat((DEFAULT_RATES.PEN.referential.sell + dayFactor * scalePEN + wave * scalePEN).toFixed(2)) 
+                    }
+                }
+            }
+        };
+        
+        if (i === 0 && currentRates.USD) {
+            entry.rates = JSON.parse(JSON.stringify(currentRates));
+        }
+        history.push(entry);
+    }
+    
+    ratesHistory = history;
+    localStorage.setItem('bolivia_cambio_rates_history', JSON.stringify(ratesHistory));
+    updateHistoryUI();
+}
+
+// Local-only save of history to localStorage
+function saveHistory() {
+    localStorage.setItem('bolivia_cambio_rates_history', JSON.stringify(ratesHistory));
+    return Promise.resolve(true);
+}
+
 // Save current rates to localStorage and cloud database
 async function saveRates() {
+    currentRates.updatedAt = Date.now();
     localStorage.setItem('bolivia_cambio_rates', JSON.stringify(currentRates));
     
+    let ratesChanged = true;
+    if (ratesHistory.length > 0) {
+        const lastEntry = ratesHistory[ratesHistory.length - 1];
+        ratesChanged = isRatesDifferent(lastEntry.rates, currentRates);
+    }
+
+    if (ratesChanged) {
+        const newEntry = {
+            timestamp: new Date(currentRates.updatedAt).toISOString(),
+            rates: JSON.parse(JSON.stringify(currentRates))
+        };
+        ratesHistory.push(newEntry);
+        if (ratesHistory.length > 100) {
+            ratesHistory.shift();
+        }
+        localStorage.setItem('bolivia_cambio_rates_history', JSON.stringify(ratesHistory));
+        updateHistoryUI();
+    }
+    
     try {
-        const jsonStr = JSON.stringify(currentRates);
-        const encoded = base64UrlEncode(jsonStr);
+        const compressedJson = compressRates(currentRates, currentRates.updatedAt);
+        const encoded = base64UrlEncode(compressedJson);
         const response = await fetch(`https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/${DB_APP_KEY}/${DB_KEY}/${encoded}`, {
             method: 'POST'
         });
@@ -114,6 +344,19 @@ async function saveRates() {
 // Reset rates to default
 async function resetRatesToDefault() {
     currentRates = JSON.parse(JSON.stringify(DEFAULT_RATES));
+    currentRates.updatedAt = Date.now();
+    
+    const newEntry = {
+        timestamp: new Date(currentRates.updatedAt).toISOString(),
+        rates: JSON.parse(JSON.stringify(currentRates))
+    };
+    ratesHistory.push(newEntry);
+    if (ratesHistory.length > 100) {
+        ratesHistory.shift();
+    }
+    saveHistory();
+    updateHistoryUI();
+    
     const savedGlobally = await saveRates();
     updateUI();
     if (savedGlobally) {
@@ -121,6 +364,63 @@ async function resetRatesToDefault() {
     } else {
         showToast('Tasas restauradas localmente (error al sincronizar en la nube).');
     }
+}
+
+let activeHistoryCurrency = 'USD';
+
+function initHistoryTabs() {
+    const tabs = document.querySelectorAll('.history-tab-btn');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            activeHistoryCurrency = tab.getAttribute('data-hist-curr');
+            updateHistoryUI();
+        });
+    });
+}
+
+function updateHistoryUI() {
+    const tableBody = document.getElementById('history-table-body');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    
+    if (ratesHistory.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="no-data">No hay datos registrados aún.</td></tr>`;
+        return;
+    }
+    
+    const displayEntries = [...ratesHistory].reverse().slice(0, 10);
+    
+    displayEntries.forEach(entry => {
+        const dateObj = new Date(entry.timestamp);
+        const options = {
+            timeZone: 'America/La_Paz',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        };
+        const formattedDate = new Intl.DateTimeFormat('es-BO', options).format(dateObj).replace(',', ' -');
+        
+        const currencyRates = entry.rates[activeHistoryCurrency];
+        if (!currencyRates) return;
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="history-timestamp">${formattedDate}</td>
+            <td class="history-val-buy">${currencyRates.official.buy.toFixed(2)} Bs.</td>
+            <td class="history-val-sell">${currencyRates.official.sell.toFixed(2)} Bs.</td>
+            <td class="history-val-buy">${currencyRates.referential.buy.toFixed(2)} Bs.</td>
+            <td class="history-val-sell">${currencyRates.referential.sell.toFixed(2)} Bs.</td>
+        `;
+        tableBody.appendChild(tr);
+    });
 }
 
 
@@ -193,35 +493,80 @@ function showToast(message) {
 let activeChartCurrency = 'USD';
 
 // Generate simulated historical rates based on the current rates to look realistic
+// Generate simulated historical rates based on the current rates to look realistic,
+// or use real registered rates if available
 function generateHistoryData(currencyCode) {
     const rate = currentRates[currencyCode];
-    const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    if (!rate) return [];
     
-    // We want the last day (Dom/index 6) to match the current rates
+    // Attempt to retrieve last 7 days of rates from ratesHistory
+    const uniqueDaysMap = new Map();
+    const daysName = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    
+    // Scan history backwards to get the most recent daily rates
+    for (let i = ratesHistory.length - 1; i >= 0; i--) {
+        const entry = ratesHistory[i];
+        if (!entry.rates || !entry.rates[currencyCode]) continue;
+        
+        const dateObj = new Date(entry.timestamp);
+        const dayStr = dateObj.toLocaleDateString('es-BO', { timeZone: 'America/La_Paz' });
+        
+        if (!uniqueDaysMap.has(dayStr)) {
+            const dayOfWeek = daysName[dateObj.getDay()];
+            uniqueDaysMap.set(dayStr, {
+                day: dayOfWeek,
+                official: entry.rates[currencyCode].official.sell,
+                referential: entry.rates[currencyCode].referential.sell,
+                date: dateObj
+            });
+        }
+        if (uniqueDaysMap.size >= 7) {
+            break;
+        }
+    }
+    
+    const realHistory = Array.from(uniqueDaysMap.values()).reverse();
+    
+    if (realHistory.length >= 7) {
+        return realHistory;
+    }
+    
+    // Pad older days with simulated data
+    const paddedHistory = [];
+    const daysShort = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const scale = currencyCode === 'USD' ? 0.12 : currencyCode === 'BRL' ? 0.05 : 0.08;
     const offRefVal = rate.official.sell;
     const refRefVal = rate.referential.sell;
     
-    // Simple mock offsets to create a beautiful trending line ending at the current rates
-    // BRL, USD, PEN have different scales
-    const scale = currencyCode === 'USD' ? 0.12 : currencyCode === 'BRL' ? 0.05 : 0.08;
-    
-    const history = [];
+    const needed = 7 - realHistory.length;
     for (let i = 0; i < 7; i++) {
-        // Create dynamic offset. E.g. a small upward trend
-        const dayFactor = (i - 6) * 0.03; 
-        const wave = Math.sin(i * 1.2) * scale * 0.4;
-        
-        const officialVal = offRefVal + (dayFactor * scale * 0.1) + wave * 0.1;
-        const referentialVal = refRefVal + (dayFactor * scale) + wave;
-        
-        history.push({
-            day: days[i],
-            // Ensure the final element matches the exact current rate
-            official: i === 6 ? offRefVal : parseFloat(officialVal.toFixed(2)),
-            referential: i === 6 ? refRefVal : parseFloat(referentialVal.toFixed(2))
-        });
+        if (i < needed) {
+            const dayFactor = (i - 6) * 0.03; 
+            const wave = Math.sin(i * 1.2) * scale * 0.4;
+            const officialVal = offRefVal + (dayFactor * scale * 0.1) + wave * 0.1;
+            const referentialVal = refRefVal + (dayFactor * scale) + wave;
+            
+            paddedHistory.push({
+                day: daysShort[i],
+                official: parseFloat(officialVal.toFixed(2)),
+                referential: parseFloat(referentialVal.toFixed(2))
+            });
+        } else {
+            const realIdx = i - needed;
+            paddedHistory.push({
+                day: realHistory[realIdx].day,
+                official: realHistory[realIdx].official,
+                referential: realHistory[realIdx].referential
+            });
+        }
     }
-    return history;
+    
+    if (paddedHistory.length > 0) {
+        paddedHistory[paddedHistory.length - 1].official = offRefVal;
+        paddedHistory[paddedHistory.length - 1].referential = refRefVal;
+    }
+    
+    return paddedHistory;
 }
 
 function drawChart(currencyCode) {
@@ -744,7 +1089,7 @@ function initDrawer() {
         e.preventDefault();
         
         // Show saving state on the submit button
-        const submitBtn = ratesForm.querySelector('button[type="submit"]');
+        const submitBtn = document.getElementById('btn-save-rates');
         const originalBtnText = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin inline-block mr-2"></i> Guardando...';
@@ -828,10 +1173,19 @@ function populateDrawerInputs() {
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Initialize Icons
-    lucide.createIcons();
+    if (typeof lucide !== 'undefined') {
+        try {
+            lucide.createIcons();
+        } catch (e) {
+            console.error('Error initializing Lucide icons:', e);
+        }
+    } else {
+        console.warn('Lucide library not loaded or defined.');
+    }
     
     // 2. Load exchange rates state
     loadRates();
+    loadHistory();
     
     // 3. Start clocks and UI toggles
     startClock();
@@ -842,10 +1196,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 5. Initialize chart switching controls
     initChartTabs();
+    initHistoryTabs();
     
     // 6. Initialize drawer sliders and form
     initDrawer();
     
     // 7. Initial render of cards, calculations and charts
     updateUI();
+    updateHistoryUI();
 });
